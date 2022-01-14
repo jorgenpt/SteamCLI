@@ -13,10 +13,10 @@ import argparse
 import json
 import requests
 
-from operator import itemgetter
-from pprint   import pprint
-from sys      import stderr, exit, argv
-from urllib   import urlencode
+from operator     import itemgetter
+from pprint       import pprint
+from sys          import stderr, exit, argv
+from urllib.parse import urlencode
 
 # To help with output encoding in Windows terminals.
 import codecs
@@ -37,7 +37,7 @@ PARAMETER_TYPEMAP = {
 
 
 def filter_none_values(d):
-    return dict((k, v) for k, v in d.iteritems() if v is not None)
+    return dict((k, v) for k, v in d.items() if v is not None)
 
 
 def argparser_for_method(prog, method):
@@ -61,20 +61,20 @@ def argparser_for_method(prog, method):
 
 
 def find_method(interfaces, interface_name, method_name, version):
-    matching_interfaces = filter(lambda interface: interface['name'] == interface_name, interfaces)
+    matching_interfaces = [interface for interface in interfaces if interface['name'] == interface_name]
     if len(matching_interfaces) < 1:
         return (None, None)
 
     interface = matching_interfaces[0]
     methods = interface['methods']
-    matching_methods = filter(lambda method: method['name'] == method_name, methods)
+    matching_methods = [method for method in methods if method['name'] == method_name]
     if len(matching_methods) < 1:
         return (interface, None)
 
     if version is None:
-        version = max(map(itemgetter('version'), matching_methods))
+        version = max(list(map(itemgetter('version'), matching_methods)))
 
-    matching_methods = filter(lambda method: method['version'] == version, matching_methods)
+    matching_methods = [method for method in matching_methods if method['version'] == version]
     if len(matching_methods) < 1:
         return (interface, None)
 
@@ -95,7 +95,7 @@ def get_interfaces(args):
     url += '?%s' % urlencode(params)
 
     if args.verbose:
-        print " ! GET request for %s" % url
+        print(" ! GET request for %s" % url)
     response = requests.get(url)
     return response.json()['apilist']['interfaces']
 
@@ -106,15 +106,15 @@ def list_commands(args):
         if args.interface and interface['name'] != args.interface:
             continue
 
-        print "> %s:" % interface['name']
+        print("> %s:" % interface['name'])
 
         for method in interface['methods']:
             if args.method and method['name'] != args.method:
                 continue
             if 'description' in method:
-                print '    %s v%i [%s]: %s' % (method['name'], method['version'], method['httpmethod'], method['description'])
+                print('    %s v%i [%s]: %s' % (method['name'], method['version'], method['httpmethod'], method['description']))
             else:
-                print '    %s v%i [%s]' % (method['name'], method['version'], method['httpmethod'])
+                print('    %s v%i [%s]' % (method['name'], method['version'], method['httpmethod']))
 
             if args.interface:
                 for parameter in method['parameters']:
@@ -125,10 +125,10 @@ def list_commands(args):
                     desc = '        %s %s %s' % (mandatory_mark, parameter['type'], parameter['name'])
                     if 'description' in parameter:
                         desc += ': %s' % (parameter['description'])
-                    print desc
+                    print(desc)
 
     if args.interface:
-        print '* = required argument'
+        print('* = required argument')
 
     return True
 
@@ -138,15 +138,15 @@ def call_command(args):
 
     interface, method = find_method(interfaces, args.interface, args.method, args.method_version)
     if not interface:
-        print >>stderr, "Invalid interface: %s" % args.interface
-        print >>stderr, "Valid values are:"
-        print >>stderr, "    %s" % ', '.join(map(itemgetter('name'), interfaces))
+        print("Invalid interface: %s" % args.interface, file=stderr)
+        print("Valid values are:", file=stderr)
+        print("    %s" % ', '.join(map(itemgetter('name'), interfaces)), file=stderr)
         return False
 
     if not method:
-        print >>stderr, "Invalid method: %s" % args.method
-        print >>stderr, "Valid values are:"
-        print >>stderr, "    %s" % ', '.join(map(itemgetter('name'), interface['methods']))
+        print("Invalid method: %s" % args.method, file=stderr)
+        print("Valid values are:", file=stderr)
+        print("    %s" % ', '.join(map(itemgetter('name'), interface['methods'])), file=stderr)
         return False
 
     # Little bit of ugliness to have nice `call FooBar baz --help` output.
@@ -170,16 +170,16 @@ def call_command(args):
         if len(arguments) > 0:
             url += '?%s' % urlencode(arguments)
         if args.verbose:
-            print " ! GET request for %s" % url
+            print(" ! GET request for %s" % url)
         response = requests.get(url)
     else:
         if args.verbose:
-            print " ! POST request for %s, body:" % url
+            print(" ! POST request for %s, body:" % url)
             pprint(arguments)
         response = requests.post(url, data=json.dumps(arguments), headers={ 'Content-Type': 'application/json' })
 
     if args.raw:
-        print response.text
+        print(response.text)
     else:
         pprint(response.json())
 
@@ -191,7 +191,7 @@ def main():
     parser.add_argument('--key', '-k', help='publisher API key for SteamWorks access (https://partner.steamgames.com/documentation/webapi#creating for details)')
     parser.add_argument('--verbose', '-v', help='print verbosely', action='store_true')
     parser.add_argument('--raw', '-r', help='print output raw (probably JSON)', action='store_true')
-    commands = parser.add_subparsers()
+    commands = parser.add_subparsers(required=True, dest='command')
 
     commands_subcommand = commands.add_parser('commands', description='list all SteamAPI commands (results will differ with & without --key)')
     commands_subcommand.add_argument('interface', nargs='?')
